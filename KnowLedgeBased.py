@@ -4,8 +4,10 @@ import ast
 from sklearn.metrics.pairwise import linear_kernel, cosine_distances, cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import NearestNeighbors
-
-
+from sklearn.model_selection import train_test_split
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error
+import warnings; warnings.simplefilter('ignore')
 def preprocessing(x):
     if pd.isnull(x):
         return ''
@@ -16,7 +18,7 @@ def null(x):
         return ''
     return x
 def Preprocess():
-    mm = pd.read_csv('D:\Recommender System\movies_metadata.csv')
+    mm = pd.read_csv('D:/Recommender System/movies_metadata.csv', low_memory=False)
     mm['belongs_to_collection'] = mm['belongs_to_collection'].apply(preprocessing)
     mm['genres'] = mm['genres'].apply(preprocessing)
     mm['spoken_languages']=mm['spoken_languages'].apply(preprocessing)
@@ -30,7 +32,7 @@ def Preprocess():
     mm = mm.sort_values(by=['release_date', 'original_title'], ascending=[0,0])
     mm = mm.drop(columns=['homepage','video'])
     ##--------------------------------
-    linksm = pd.read_csv('D:\Recommender System\links_small.csv')
+    linksm = pd.read_csv('D:/Recommender System/links_small.csv')
     linksm = linksm[linksm['tmdbId'].notnull()]['tmdbId'].astype('int')
     linksm_mm = mm['id'].isin(linksm)
     linksm_mm = mm[linksm_mm]
@@ -39,21 +41,11 @@ def Preprocess():
     linksm_mm['script'] = linksm_mm['tagline'] +' '+ linksm_mm['overview']
     linksm_mm['script'] = linksm_mm['script'].apply(null)
     return linksm_mm, linksm, mm
-def TF_IDF():
-    #TF-IDF
-    linksm_mm = Preprocess()
-    TfIdf_Cal = TfidfVectorizer(analyzer='word', ngram_range=(1,2), min_df=0.0,stop_words='english')
-    TfIdf_matrix = TfIdf_Cal.fit_transform(linksm_mm['script'])
-    #Processing
-    linksm_mm = linksm_mm.reset_index()
-    movie_id_name = pd.Series(linksm_mm.index, index=linksm_mm['title'])
-    return TfIdf_matrix, movie_id_name, linksm_mm
 ##--------------------------------
 def KnowLedge_Based():
-    cre = pd.read_csv('D:\Recommender System\credits.csv')  
-    key=pd.read_csv('D:\Recommender System\keywords.csv')
-    mm = Preprocess()
-    linksm = Preprocess()
+    cre = pd.read_csv('D:/Recommender System/credits.csv')  
+    key=pd.read_csv('D:/Recommender System/keywords.csv')
+    _, linksm, mm = Preprocess()
     key['id']=key['id'].astype('int')
     cre['id']=cre['id'].astype('int')
     mm = mm.merge(cre, on='id')
@@ -90,7 +82,7 @@ def KnowLedge_Based():
     meta_mm['crew_name']=meta_mm['crew'].apply(extract_list_name)
     meta_mm['character']=meta_mm['cast'].apply(extract_list_character)
     return meta_mm
-def option_choosen(type, Fval):
+def option_choosen(type, Fval, top=10):
     meta_mm = KnowLedge_Based()
     valid_columns = ['genres_list', 'keyw', 'crew_name', 'character']
     
@@ -100,6 +92,9 @@ def option_choosen(type, Fval):
     
     meta_mm[type] = meta_mm[type].apply(lambda x: x if isinstance(x, list) else ([] if pd.isna(x) else x))
     df = meta_mm[meta_mm[type].explode().eq(Fval).groupby(level=0).any()]
+    
+    search_value_lower = Fval.lower()
+    df = meta_mm[meta_mm[type].apply(lambda x: any(search_value_lower in item.lower() for item in x))]
     
     if df.empty:
         print(f"Không tìm thấy phim nào với '{Fval}' trong '{type}'.")
@@ -114,6 +109,8 @@ def option_choosen(type, Fval):
     specific_data['vote_average'] = specific_data['vote_average'].astype('float')
 
     specific_data['wr'] = (specific_data['vote_count'] * specific_data['vote_average'] + M * C) / (specific_data['vote_count'] + M)
-    specific_data = specific_data.sort_values('wr', ascending=False).head(250)
-
+    specific_data = specific_data.sort_values('wr', ascending=False).head(top)
+    specific_data.to_csv('../specific_data.csv', index=False)
+    print(f"Dữ liệu đã được lưu vào '{'../specific_data.csv'}'.")
     return specific_data
+
