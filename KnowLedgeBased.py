@@ -1,12 +1,9 @@
 import pandas as pd
 import numpy as np
 import ast
-from sklearn.metrics.pairwise import linear_kernel, cosine_distances, cosine_similarity
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import NearestNeighbors
 from sklearn.model_selection import train_test_split
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error
+from Cache import cache_manager
 import warnings; warnings.simplefilter('ignore')
 def preprocessing(x):
     if pd.isnull(x):
@@ -17,6 +14,7 @@ def null(x):
     if pd.isnull(x):
         return ''
     return x
+
 def Preprocess():
     mm = pd.read_csv('D:/Recommender System/movies_metadata.csv', low_memory=False)
     mm['belongs_to_collection'] = mm['belongs_to_collection'].apply(preprocessing)
@@ -32,7 +30,7 @@ def Preprocess():
     mm = mm.sort_values(by=['release_date', 'original_title'], ascending=[0,0])
     mm = mm.drop(columns=['homepage','video'])
     ##--------------------------------
-    linksm = pd.read_csv('D:/Recommender System/links_small.csv')
+    linksm = pd.read_csv('D:/Recommender System/links.csv')
     linksm = linksm[linksm['tmdbId'].notnull()]['tmdbId'].astype('int')
     linksm_mm = mm['id'].isin(linksm)
     linksm_mm = mm[linksm_mm]
@@ -42,6 +40,7 @@ def Preprocess():
     linksm_mm['script'] = linksm_mm['script'].apply(null)
     return linksm_mm, linksm, mm
 ##--------------------------------
+@cache_manager.cache
 def KnowLedge_Based():
     cre = pd.read_csv('D:/Recommender System/credits.csv')  
     key=pd.read_csv('D:/Recommender System/keywords.csv')
@@ -82,22 +81,70 @@ def KnowLedge_Based():
     meta_mm['crew_name']=meta_mm['crew'].apply(extract_list_name)
     meta_mm['character']=meta_mm['cast'].apply(extract_list_character)
     return meta_mm
+
+@cache_manager.cache
+def get_all_unique_values(filterT):
+    meta_mm = KnowLedge_Based()
+    temp = []
+    for value in meta_mm[filterT]:
+        if isinstance(value, list):
+            temp.extend(value)
+    temp = [item for item in temp if item and str(item).strip()]
+    return list(set(temp))
+
+def random_option(filterT, sample=10):
+    all_values = get_all_unique_values(filterT)
+    np.random.seed(None)
+    if len(all_values) > sample:
+        random_samples = np.random.choice(all_values, sample, replace=False).tolist()
+    else:
+        random_samples = all_values
+    return random_samples
+
+@cache_manager.cache
+def show_all_options(filter_type, limit=20):
+    meta_mm = KnowLedge_Based()
+    valid_columns = ['genres_list', 'keyw', 'crew_name', 'character']
+    
+    if filter_type not in valid_columns:
+        print(f"'{filter_type}' not available")
+        return
+    all_values = []
+    for values_list in meta_mm[filter_type]:
+        if isinstance(values_list, list):
+            all_values.extend(values_list)
+    
+    unique_values = sorted(list(set(all_values)))
+    
+    print(f"\nAll {filter_type} exist ({len(unique_values)}):")
+    for i, value in enumerate(unique_values[:limit], 1):
+        print(f"{i}. {value}")
+    
+    if len(unique_values) > limit:
+        print(f"... and {len(unique_values) - limit} other value")
+    
 def option_choosen(type, Fval, top=10):
     meta_mm = KnowLedge_Based()
     valid_columns = ['genres_list', 'keyw', 'crew_name', 'character']
     
     if type not in valid_columns:
-        print(f"Loại '{type}' không hợp lệ. Vui lòng chọn trong: {valid_columns}")
+        print(f"'{type}' not available. Please choose in: {valid_columns}")
         return pd.DataFrame(columns=['title', 'vote_count', 'vote_average', 'genres_list', 'keyw', 'crew_name', 'character'])
     
+    random_examples = random_option(type, 10)
+    if random_examples:
+        print(f"\n💡 Example {type} exist:")
+        for i, example in enumerate(random_examples, 1):
+            print(f"{i}. {example}")
+
     meta_mm[type] = meta_mm[type].apply(lambda x: x if isinstance(x, list) else ([] if pd.isna(x) else x))
     df = meta_mm[meta_mm[type].explode().eq(Fval).groupby(level=0).any()]
     
     search_value_lower = Fval.lower()
-    df = meta_mm[meta_mm[type].apply(lambda x: any(search_value_lower in item.lower() for item in x))]
-    
+    df = meta_mm[meta_mm[type].apply(lambda x: any(search_value_lower in str(item).lower() for item in x))]
+
     if df.empty:
-        print(f"Không tìm thấy phim nào với '{Fval}' trong '{type}'.")
+        print(f"Not found '{Fval}' in '{type}'.")
         return pd.DataFrame(columns=['title', 'vote_count', 'vote_average', 'genres_list', 'keyw', 'crew_name', 'character'])
     
     vote_avg = df[df['vote_average'].notnull()]['vote_average'].astype('float')
