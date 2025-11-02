@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    build: ./api_gateway
+    ports: ["8000:8000"]
+    environment:
+      - REDIS_HOST=redis
+      - QUORUM_ENABLED=true
+    depends_on:
+      - redis
+    networks:
+      - rtb-network
+
+  bidding-service-1:
+    build: ./bidding_services
+    environment:
+      - SERVICE_ID=1
+    networks:
+      - rtb-network
+
+  bidding-service-2:
+    build: ./bidding_services
+    environment:
+      - SERVICE_ID=2
+    networks:
+      - rtb-network
+
+  bidding-service-3:
+    build: ./bidding_services
+    environment:
+      - SERVICE_ID=3
+    networks:
+      - rtb-network
+
+  bidding-service-4:
+    build: ./bidding_services
+    environment:
+      - SERVICE_ID=4
+    networks:
+      - rtb-network
+
+  bidding-service-5:
+    build: ./bidding_services
+    environment:
+      - SERVICE_ID=5
+    networks:
+      - rtb-network
+
+  consensus-coordinator:
+    build: ./consensus_coordinator
+    networks:
+      - rtb-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - rtb-network
+
+networks:
+  rtb-network:
+    driver: bridge

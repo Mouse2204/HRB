@@ -16,7 +16,7 @@ def null(x):
     return x
 
 def Preprocess():
-    mm = pd.read_csv('D:/Recommender System/movies_metadata.csv', low_memory=False)
+    mm = pd.read_csv('./movies_metadata.csv', low_memory=False)
     mm['belongs_to_collection'] = mm['belongs_to_collection'].apply(preprocessing)
     mm['genres'] = mm['genres'].apply(preprocessing)
     mm['spoken_languages']=mm['spoken_languages'].apply(preprocessing)
@@ -42,8 +42,8 @@ def Preprocess():
 ##--------------------------------
 @cache_manager.cache
 def KnowLedge_Based():
-    cre = pd.read_csv('D:/Recommender System/credits.csv')  
-    key=pd.read_csv('D:/Recommender System/keywords.csv')
+    cre = pd.read_csv('./credits.csv')  
+    key=pd.read_csv('./keywords.csv')
     _, linksm, mm = Preprocess()
     key['id']=key['id'].astype('int')
     cre['id']=cre['id'].astype('int')
@@ -133,7 +133,7 @@ def option_choosen(type, Fval, top=10):
     
     random_examples = random_option(type, 10)
     if random_examples:
-        print(f"\n💡 Example {type} exist:")
+        print(f"\n Example {type} exist:")
         for i, example in enumerate(random_examples, 1):
             print(f"{i}. {example}")
 

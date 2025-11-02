@@ -17,7 +17,7 @@ def null(x):
     return x
 @cache_manager.cache
 def Preprocess():
-    mm = pd.read_csv('D:/Recommender System/movies_metadata.csv', low_memory=False)
+    mm = pd.read_csv('./movies_metadata.csv', low_memory=False)
     mm['belongs_to_collection'] = mm['belongs_to_collection'].apply(preprocessing)
     mm['genres'] = mm['genres'].apply(preprocessing)
     mm['spoken_languages']=mm['spoken_languages'].apply(preprocessing)
@@ -31,7 +31,7 @@ def Preprocess():
     mm = mm.sort_values(by=['release_date', 'original_title'], ascending=[0,0])
     mm = mm.drop(columns=['homepage','video'])
     ##--------------------------------
-    linksm = pd.read_csv('D:/Recommender System/links.csv')
+    linksm = pd.read_csv('./links.csv')
     linksm = linksm[linksm['tmdbId'].notnull()]['tmdbId'].astype('int')
     linksm_mm = mm['id'].isin(linksm)
     linksm_mm = mm[linksm_mm]
